@@ -18,7 +18,7 @@ This project provides an easy-to-use installer and manager for [Pingtunnel](http
 1. The Bash menu installer :
 
 ```bash
-
+bash <(curl -Ls https://raw.githubusercontent.com/hoseinlolready/Pingtunnel_manager/refs/heads/main/Source/bash.sh)
 ```
 ---
 ## The usage :
