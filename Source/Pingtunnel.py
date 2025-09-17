@@ -1,29 +1,96 @@
 #!/usr/bin/env python3
-import os, sys, json, stat, platform, tempfile, urllib.request, zipfile, subprocess, shutil, time, signal
-from getpass import getpass
+import os, sys, stat, json, time, platform, tempfile, zipfile, urllib.request, shutil, subprocess
 from pathlib import Path
-from datetime import datetime
 
 INSTALL_DIR = Path("/opt/pingtunnel")
 BIN_DIR = INSTALL_DIR / "bin"
 CONF_DIR = INSTALL_DIR / "conf"
 LOG_DIR = Path("/var/log/pingtunnel")
-RUNNER = INSTALL_DIR / "run_pingtunnel.py"
+RUNNER_PATH = INSTALL_DIR / "run_pingtunnel.py"
+CONFIG_PATH = CONF_DIR / "config.json"
 SYMLINK = Path("/usr/local/bin/pingtunnel")
 SYSTEMD_UNIT = "pingtunnel.service"
 UNIT_PATH = Path("/etc/systemd/system") / SYSTEMD_UNIT
-PIDFILE = Path("/var/run/pingtunnel.pid")
-LOG_FILE = LOG_DIR / "pingtunnel.log"
-LOGROTATE_PATH = Path("/etc/logrotate.d/pingtunnel")
-DEFAULT_MEMORY_MB = 512
+PID_FILE = Path("/run/pingtunnel.pid")
 
 URLS = {
-    "amd64": "https://github.com/esrrhs/pingtunnel/releases/download/2.8/pingtunnel_linux_amd64.zip",
-    "arm64": "https://github.com/esrrhs/pingtunnel/releases/download/2.8/pingtunnel_linux_arm64.zip",
-    "386":  "https://github.com/esrrhs/pingtunnel/releases/download/2.8/pingtunnel_linux_386.zip",
+    "x86_64": "https://github.com/esrrhs/pingtunnel/releases/download/2.8/pingtunnel_linux_amd64.zip",
+    "amd64":  "https://github.com/esrrhs/pingtunnel/releases/download/2.8/pingtunnel_linux_amd64.zip",
+    "aarch64":"https://github.com/esrrhs/pingtunnel/releases/download/2.8/pingtunnel_linux_arm64.zip",
+    "arm64":  "https://github.com/esrrhs/pingtunnel/releases/download/2.8/pingtunnel_linux_arm64.zip",
+    "i386":   "https://github.com/esrrhs/pingtunnel/releases/download/2.8/pingtunnel_linux_386.zip",
+    "i686":   "https://github.com/esrrhs/pingtunnel/releases/download/2.8/pingtunnel_linux_386.zip",
 }
 
-def now(): return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+def is_root():
+    return os.geteuid() == 0
+
+def die(msg):
+    print(msg, file=sys.stderr)
+    sys.exit(1)
+
+def detect_url():
+    m = platform.machine().lower()
+    if m in URLS:
+        return URLS[m]
+    if "arm" in m:
+        return URLS.get("arm64")
+    return URLS.get("x86_64")
+
+def ensure_dirs():
+    BIN_DIR.mkdir(parents=True, exist_ok=True)
+    CONF_DIR.mkdir(parents=True, exist_ok=True)
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+def download_zip(url, dest, tries=4):
+    last = None
+    for i in range(1, tries+1):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent":"curl/7.68.0"})
+            with urllib.request.urlopen(req, timeout=30) as r:
+                with open(dest, "wb") as f:
+                    while True:
+                        chunk = r.read(8192)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+            return
+        except Exception as e:
+            last = e
+            time.sleep(1 + i)
+    raise last
+
+def safe_extract(zipfile_path, target_dir):
+    with zipfile.ZipFile(zipfile_path, "r") as z:
+        for name in z.namelist():
+            dest = (target_dir / name).resolve()
+            if not str(dest).startswith(str(target_dir.resolve())):
+                raise Exception("unsafe zip")
+        z.extractall(str(target_dir))
+
+def find_binary():
+    for p in BIN_DIR.rglob("*"):
+        if p.is_file() and "pingtunnel" in p.name.lower():
+            try:
+                p.chmod(p.stat().st_mode | 0o111)
+            except Exception:
+                pass
+            return p
+    return None
+
+RUNNER_CODE = r'''#!/usr/bin/env python3
+import os, sys, json, subprocess, time, signal, shutil
+from pathlib import Path
+
+INSTALL_DIR = Path("{INSTALL_DIR}")
+BIN_DIR = INSTALL_DIR / "bin"
+CONF = INSTALL_DIR / "conf" / "config.json"
+LOG_DIR = Path("{LOG_DIR}")
+LOG_FILE = LOG_DIR / "pingtunnel.log"
+UNIT = "{SYSTEMD_UNIT}"
+PID_FILE = Path("/run/pingtunnel.pid")
+
+def now(): return time.strftime("%Y-%m-%d %H:%M:%S")
 
 def log(s):
     try:
@@ -34,409 +101,453 @@ def log(s):
         pass
     print(f"{now()} {s}")
 
-def run(cmd, check=False):
-    try:
-        r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=check)
-        return r
-    except subprocess.CalledProcessError as e:
-        return e
+def load_conf():
+    if not CONF.exists():
+        raise SystemExit("config missing")
+    return json.load(open(CONF))
 
-def detect_arch():
-    m = platform.machine().lower()
-    if m in ("x86_64", "amd64"): return "amd64"
-    if m in ("aarch64", "arm64"): return "arm64"
-    if m in ("i386", "i486", "i586", "i686", "x86"): return "386"
-    if "arm" in m: return "arm64"
-    return None
-
-def download_with_retries(url, dest_path, tries=3, timeout=30):
-    last_err = None
-    for attempt in range(1, tries+1):
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent":"curl/7.64.1"})
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                data = resp.read()
-            with open(dest_path, "wb") as f:
-                f.write(data)
-            return True
-        except Exception as e:
-            last_err = e
-            log(f"download attempt {attempt} failed: {e}")
-            time.sleep(1 + attempt)
-    raise RuntimeError(f"download failed: {last_err}")
-
-def safe_extract_zip(zip_path, dest_dir):
-    with zipfile.ZipFile(zip_path, "r") as z:
-        members = z.namelist()
-        z.extractall(dest_dir)
-    return members
-
-def find_pingtunnel_binary(search_dir):
-    for p in search_dir.rglob("*"):
-        if p.is_file() and "pingtunnel" in p.name and p.stat().st_size > 10000:
+def find_bin(conf):
+    b = conf.get("binary")
+    if b:
+        p = Path(b)
+        if p.exists():
             return p
-    return None
+    for x in BIN_DIR.rglob("*"):
+        if x.is_file() and "pingtunnel" in x.name.lower():
+            try:
+                x.chmod(x.stat().st_mode | 0o111)
+            except:
+                pass
+            return x
+    raise SystemExit("pingtunnel binary not found")
 
-def write_json(path, data, mode=0o600):
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
-    os.chmod(path, mode)
+def build_args(conf, binpath):
+    args = [str(binpath)]
+    # Flexible mapping: support several common flag styles via config keys
+    mode = conf.get("mode","server")
+    if mode == "server":
+        # common server flags: -mode server, -l LISTEN, etc. Use safe defaults: -mode server -port
+        args += ["-mode","server"]
+    else:
+        args += ["-mode","client"]
+    # add server/ip/port combos
+    # user may supply 'listen' as "ip:port" or server_ip + port
+    listen = conf.get("listen")
+    if listen:
+        args += ["-l", str(listen)]
+    else:
+        if "server_ip" in conf and "port" in conf:
+            args += ["-server", str(conf.get("server_ip")), "-port", str(conf.get("port"))]
+        elif "port" in conf:
+            args += ["-port", str(conf.get("port"))]
+    # password
+    if "password" in conf:
+        args += ["-password", str(conf.get("password"))]
+    # extra args (string or list)
+    extra = conf.get("extra_args")
+    if extra:
+        if isinstance(extra, list):
+            args += extra
+        else:
+            args += str(extra).split()
+    # ensure no-log / no-print defaults
+    if "-nolog" not in args and "nolog" in conf:
+        args += ["-nolog", str(conf.get("nolog",1))]
+    if "-noprint" not in args and "noprint" in conf:
+        args += ["-noprint", str(conf.get("noprint",1))]
+    return args
 
-def read_json(path):
-    with open(path) as f:
-        return json.load(f)
+def apply_systemd_memory(conf):
+    m = int(conf.get("memory_mb", 0) or 0)
+    dropin = Path("/etc/systemd/system") / (UNIT + ".d")
+    memfile = dropin / "memory.conf"
+    if m > 0:
+        dropin.mkdir(parents=True, exist_ok=True)
+        memfile.write_text("[Service]\nMemoryLimit=%dM\n" % m)
+        subprocess.run(["systemctl","daemon-reload"])
+    else:
+        if memfile.exists():
+            try:
+                memfile.unlink()
+                subprocess.run(["systemctl","daemon-reload"])
+            except:
+                pass
 
-def create_systemd_unit(runner_path):
-    unit = f"""[Unit]
-Description=pingtunnel monitor
+def monitor_loop():
+    conf = load_conf()
+    binpath = find_bin(conf)
+    apply_systemd_memory(conf)
+    args = build_args(conf, binpath)
+    log("monitor starting")
+    while True:
+        log("launching: " + " ".join(args))
+        try:
+            p = subprocess.Popen(args)
+            log("started pid=%d" % p.pid)
+            ret = p.wait()
+            if ret < 0:
+                log("killed by signal %d" % (-ret))
+            else:
+                log("exited code %d" % ret)
+        except Exception as e:
+            log("launch error: " + str(e))
+        time.sleep(3)
+
+def is_systemd_available():
+    return shutil.which("systemctl") is not None
+
+def start():
+    if is_systemd_available():
+        subprocess.run(["systemctl","start",UNIT])
+        log("systemctl start requested")
+        return
+    # fallback background monitor
+    cmd = [sys.executable, str(Path(__file__)), "--run"]
+    with open(LOG_FILE, "a") as out:
+        p = subprocess.Popen(cmd, stdout=out, stderr=out, preexec_fn=os.setsid)
+    try:
+        PID_FILE.write_text(str(p.pid))
+    except:
+        pass
+    log("background monitor started pid=%d" % p.pid)
+
+def stop():
+    if is_systemd_available():
+        subprocess.run(["systemctl","stop",UNIT])
+        log("systemctl stop requested")
+        return
+    if PID_FILE.exists():
+        try:
+            pid = int(PID_FILE.read_text().strip())
+            os.kill(pid, signal.SIGTERM)
+            time.sleep(1)
+            try:
+                os.kill(pid, 0)
+                os.kill(pid, signal.SIGKILL)
+            except:
+                pass
+            PID_FILE.unlink()
+            log("background monitor stopped")
+        except Exception as e:
+            log("stop error: " + str(e))
+    else:
+        subprocess.run(["pkill","-f","pingtunnel"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        log("pkill fallback used")
+
+def status():
+    if is_systemd_available():
+        subprocess.run(["systemctl","status",UNIT,"--no-pager"])
+        return
+    if PID_FILE.exists():
+        try:
+            pid = int(PID_FILE.read_text().strip())
+            os.kill(pid, 0)
+            print("monitor running pid", pid)
+            return
+        except:
+            print("stale pidfile")
+    subprocess.run(["pgrep","-fl","pingtunnel"])
+
+def logs(n=200):
+    if LOG_FILE.exists():
+        subprocess.run(["tail","-n", str(n), str(LOG_FILE)])
+    else:
+        print("no logs yet")
+
+def edit():
+    editor = os.environ.get("EDITOR","nano")
+    subprocess.run([editor, str(CONF)])
+
+def update():
+    url_map = {URLS}
+    m = platform.machine().lower()
+    url = url_map.get(m)
+    if not url:
+        if "arm" in m:
+            url = url_map.get("arm64")
+        else:
+            url = url_map.get("x86_64")
+    tmp = tempfile.mktemp(suffix=".zip")
+    log("downloading update " + str(url))
+    urllib.request.urlretrieve(url, tmp)
+    safe_extract(tmp, BIN_DIR)
+    os.remove(tmp)
+    b = find_bin(load_conf())
+    b.chmod(b.stat().st_mode | 0o111)
+    log("binary updated to " + str(b))
+
+def uninstall():
+    stop()
+    if shutil.which("systemctl"):
+        subprocess.run(["systemctl","disable",UNIT], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            dr = Path("/etc/systemd/system") / (UNIT + ".d")
+            if dr.exists():
+                for f in dr.iterdir():
+                    f.unlink()
+                dr.rmdir()
+        except:
+            pass
+    try:
+        if Path("{INSTALL_DIR}").exists():
+            shutil.rmtree(Path("{INSTALL_DIR}"))
+    except Exception as e:
+        log("remove error: " + str(e))
+    try:
+        if Path("{LOG_DIR}").exists():
+            shutil.rmtree(Path("{LOG_DIR}"))
+    except:
+        pass
+    try:
+        u = Path("{UNIT_PATH}")
+        if u.exists():
+            u.unlink()
+            subprocess.run(["systemctl","daemon-reload"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except:
+        pass
+    try:
+        sl = Path("{SYMLINK}")
+        if sl.exists() or sl.is_symlink():
+            sl.unlink()
+    except:
+        pass
+    log("uninstall finished")
+
+if __name__ == "__main__":
+    import sys, signal, tempfile, zipfile, urllib.request, shutil, platform
+    if len(sys.argv) > 1:
+        a = sys.argv[1].lower()
+        if a == "--run": monitor_loop()
+        elif a == "start": start()
+        elif a == "stop": stop()
+        elif a == "restart": stop(); time.sleep(1); start()
+        elif a == "status": status()
+        elif a == "logs": logs(int(sys.argv[2]) if len(sys.argv) > 2 else 200)
+        elif a == "edit": edit()
+        elif a == "update": update()
+        elif a == "uninstall": uninstall()
+        else:
+            print("commands: --run start stop restart status logs edit update uninstall")
+    else:
+        while True:
+            print("\\nrun_pingtunnel menu: 1)start 2)stop 3)restart 4)status 5)logs 6)edit 7)update 8)uninstall 9)exit")
+            c = input("choice: ").strip()
+            if c == "1": start()
+            elif c == "2": stop()
+            elif c == "3": stop(); time.sleep(1); start()
+            elif c == "4": status()
+            elif c == "5": logs()
+            elif c == "6": edit()
+            elif c == "7": update()
+            elif c == "8": uninstall()
+            elif c == "9": break
+            else: print("invalid")
+'''.replace("{INSTALL_DIR}", str(INSTALL_DIR)).replace("{LOG_DIR}", str(LOG_DIR)).replace("{SYSTEMD_UNIT}", SYSTEMD_UNIT).replace("{UNIT_PATH}", str(UNIT_PATH)).replace("{SYMLINK}", str(SYMLINK)).replace("{URLS}", json.dumps(URLS))
+
+def write_runner_file():
+    RUNNER_PATH.parent.mkdir(parents=True, exist_ok=True)
+    RUNNER_PATH.write_text(RUNNER_CODE)
+    RUNNER_PATH.chmod(0o700)
+
+def write_systemd_unit():
+    content = f"""[Unit]
+Description=pingtunnel runner
 After=network.target
 
 [Service]
 Type=simple
-ExecStart={sys.executable} {runner_path} --run
+ExecStart={sys.executable} {RUNNER_PATH} --run
 Restart=on-failure
 RestartSec=5
-LimitNOFILE=65536
 WorkingDirectory={INSTALL_DIR}
-StandardOutput=append:{LOG_FILE}
-StandardError=append:{LOG_FILE}
+StandardOutput=append:{LOG_DIR}/pingtunnel.log
+StandardError=append:{LOG_DIR}/pingtunnel.log
 
 [Install]
 WantedBy=multi-user.target
 """
-    UNIT_PATH.write_text(unit)
-    run(["systemctl", "daemon-reload"])
+    UNIT_PATH.write_text(content)
+    subprocess.run(["systemctl", "daemon-reload"], check=False)
 
-def create_logrotate():
-    s = f"""{LOG_DIR}/*.log {{
-    daily
-    rotate 14
-    compress
-    missingok
-    notifempty
-    create 0640 root root
-    sharedscripts
-    postrotate
-        systemctl try-restart {SYSTEMD_UNIT} > /dev/null 2>&1 || true
-    endscript
-}}
-"""
-    try:
-        LOGROTATE_PATH.write_text(s)
-    except Exception:
-        pass
-
-def install_flow():
-    if os.geteuid() != 0:
-        sys.exit("run installer as root")
-    arch = detect_arch()
-    if not arch:
-        arch = input("arch (amd64/arm64/386): ").strip()
-    if arch not in URLS:
-        sys.exit("unsupported arch")
-    url = URLS[arch]
-    INSTALL_DIR.mkdir(parents=True, exist_ok=True)
-    BIN_DIR.mkdir(parents=True, exist_ok=True)
-    CONF_DIR.mkdir(parents=True, exist_ok=True)
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    tmpzip = tempfile.mktemp(prefix="pt_", suffix=".zip")
-    log(f"downloading {url}")
-    download_with_retries(url, tmpzip, tries=5)
-    log("extracting")
-    members = safe_extract_zip(tmpzip, BIN_DIR)
-    os.unlink(tmpzip)
-    binpath = find_pingtunnel_binary(BIN_DIR)
-    if not binpath:
-        sys.exit("could not find binary in archive")
-    binpath.chmod(binpath.stat().st_mode | stat.S_IXUSR)
-    default_mode = "server"
-    mode = input(f"mode (server/client) [{default_mode}]: ").strip() or default_mode
-    if mode not in ("server","client"): mode = default_mode
-    password = getpass("password (hidden, Enter for changeme): ") or "changeme"
-    server_ip = input("server ip (client mode) [127.0.0.1]: ").strip() or "127.0.0.1"
-    port = input("tunnel port [4000]: ").strip() or "4000"
-    try:
-        port = int(port)
-    except:
-        port = 4000
-    mem = input(f"memory limit MB (0=disabled) [{DEFAULT_MEMORY_MB}]: ").strip()
-    try:
-        mem = int(mem) if mem != "" else DEFAULT_MEMORY_MB
-    except:
-        mem = DEFAULT_MEMORY_MB
-    auto_start = input("enable autostart (systemd) (y/N): ").strip().lower() == "y"
-    conf = {
-        "mode": mode,
-        "password": password,
-        "server_ip": server_ip,
-        "port": port,
-        "memory_mb": mem,
-        "auto_start": auto_start,
-        "extra_args": "-nolog 1 -noprint 1",
-        "binary": str(binpath.resolve()),
-        "arch": arch,
-        "installed_at": now()
-    }
-    write_json(CONF_DIR / "config.json", conf)
-    with open(RUNNER, "w") as f:
-        f.write(RUNNER_SCRIPT)
-    os.chmod(RUNNER, 0o700)
+def create_symlink():
     try:
         if SYMLINK.exists() or SYMLINK.is_symlink():
             SYMLINK.unlink()
-        SYMLINK.symlink_to(RUNNER)
+        SYMLINK.symlink_to(RUNNER_PATH)
     except Exception as e:
-        log(f"symlink error: {e}")
-    create_systemd_unit(RUNNER)
-    create_logrotate()
-    if conf["auto_start"]:
-        run(["systemctl", "enable", SYSTEMD_UNIT])
-        run(["systemctl", "start", SYSTEMD_UNIT])
-    log("install complete")
-    print("use: pingtunnel start|stop|restart|status|logs|config|edit|update|uninstall")
+        print("symlink error:", e)
 
-RUNNER_SCRIPT = r"""#!/usr/bin/env python3
-import os,sys,json,subprocess,time,signal,shutil
-from pathlib import Path
-from datetime import datetime
-INSTALL_DIR=Path("/opt/pingtunnel")
-BIN_DIR=INSTALL_DIR/"bin"
-CONF=INSTALL_DIR/"conf"/"config.json"
-LOG_DIR=Path("/var/log/pingtunnel")
-LOG_FILE=LOG_DIR/"pingtunnel.log"
-PIDFILE=Path("/var/run/pingtunnel.pid")
-UNIT="pingtunnel.service"
-def now(): return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-def log(s):
-    try:
-        LOG_DIR.mkdir(parents=True,exist_ok=True)
-        with open(LOG_FILE,"a") as f: f.write(f"{now()} {s}\n")
-    except:
-        pass
-    print(f"{now()} {s}")
-def load_conf():
-    if not CONF.exists(): sys.exit("config missing")
-    return json.load(open(CONF))
-def find_bin(conf):
-    p = conf.get("binary")
-    if p and Path(p).exists(): return Path(p)
-    for x in BIN_DIR.rglob("*"):
-        if x.is_file() and "pingtunnel" in x.name:
-            return x
-    raise SystemExit("binary not found")
-def build_args(conf, binp):
-    a=[str(binp)]
-    if conf.get("mode")=="server":
-        a += ["-mode","server","-password",conf["password"],"-port",str(conf["port"])]
-    else:
-        a += ["-mode","client","-password",conf["password"],"-server",conf["server_ip"],"-port",str(conf["port"])]
-    extra = conf.get("extra_args","-nolog 1 -noprint 1")
-    if isinstance(extra,str): a += extra.split()
-    return a
-def apply_systemd_mem(conf):
-    m = int(conf.get("memory_mb",0) or 0)
-    d = Path("/etc/systemd/system") / (UNIT + ".d")
-    f = d / "memory.conf"
-    if m>0:
-        d.mkdir(parents=True,exist_ok=True)
-        f.write_text("[Service]\nMemoryLimit=%dM\n" % m)
-        subprocess.run(["systemctl","daemon-reload"])
-    else:
-        if f.exists(): f.unlink(); subprocess.run(["systemctl","daemon-reload"])
-def enforce_mem_and_exec(args, mem_mb):
-    mem = int(mem_mb or 0)
-    if mem>0:
-        try:
-            import resource
-            pid = os.fork()
-            if pid>0:
-                return pid
-            else:
-                maxbytes = mem * 1024 * 1024
-                resource.setrlimit(resource.RLIMIT_AS, (maxbytes, maxbytes))
-                os.execv(args[0], args)
-        except Exception as e:
-            log(f"setrlimit failed: {e}, trying prlimit")
-            pr = shutil.which("prlimit")
-            if pr:
-                cmd = [pr, f"--as={mem*1024*1024}", "--"] + args
-                return subprocess.Popen(cmd).pid
-            else:
-                return subprocess.Popen(args).pid
-    else:
-        return subprocess.Popen(args).pid
-def monitor_loop():
-    conf = load_conf()
-    binp = find_bin(conf)
-    apply_systemd_mem(conf)
-    args = build_args(conf, binp)
-    log("monitor loop starting")
-    while True:
-        log("starting child")
-        try:
-            mem = conf.get("memory_mb",0) or 0
-            if os.path.exists("/run/systemd/system") or shutil.which("systemctl"):
-                p = subprocess.Popen(args)
-                pid = p.pid
-                log(f"child pid={pid}")
-                r = p.wait()
-                if r<0:
-                    log(f"child killed by signal {-r}")
-                else:
-                    log(f"child exited {r}")
-            else:
-                pid = enforce_mem_and_exec(args, mem)
-                log(f"child pid={pid}")
-                _, status = os.waitpid(pid, 0)
-                if os.WIFSIGNALED(status):
-                    sig = os.WTERMSIG(status)
-                    log(f"child signaled {sig}")
-                else:
-                    code = os.WEXITSTATUS(status)
-                    log(f"child exited {code}")
-        except Exception as e:
-            log("monitor exception: "+str(e))
-        time.sleep(3)
-def is_systemd_available():
-    return os.path.exists("/run/systemd/system") or shutil.which("systemctl")
-def start_service():
-    if is_systemd_available():
-        subprocess.run(["systemctl","start",UNIT])
-        log("systemd start requested")
+def create_default_config():
+    if CONFIG_PATH.exists():
         return
-    if PIDFILE.exists():
-        try:
-            pid = int(PIDFILE.read_text().strip())
-            os.kill(pid,0)
-            print("already running")
-            return
-        except Exception:
-            PIDFILE.unlink()
-    cmd = [sys.executable, str(Path(__file__)), "--run"]
-    p = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, preexec_fn=os.setsid)
-    PIDFILE.write_text(str(p.pid))
-    log(f"started background pid={p.pid}")
-def stop_service():
-    if is_systemd_available():
-        subprocess.run(["systemctl","stop",UNIT])
-        log("systemd stop requested")
-        return
-    if PIDFILE.exists():
-        try:
-            pid = int(PIDFILE.read_text().strip())
-            os.kill(pid, signal.SIGTERM)
-            time.sleep(1)
-            try:
-                os.kill(pid,0)
-                os.kill(pid, signal.SIGKILL)
-            except:
-                pass
-            PIDFILE.unlink()
-            log("stopped background")
-        except Exception as e:
-            log("stop error: "+str(e))
-def status():
-    if is_systemd_available():
-        r = subprocess.run(["systemctl","status",UNIT,"--no-pager"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        print(r.stdout.decode() or r.stderr.decode())
-        return
-    if PIDFILE.exists():
-        try:
-            pid = int(PIDFILE.read_text().strip())
-            os.kill(pid,0)
-            print("running pid",pid)
-            return
-        except Exception:
-            print("stale pidfile")
-    print("not running")
-def logs(n=200):
-    if LOG_FILE.exists():
-        lines = open(LOG_FILE).read().splitlines()[-n:]
-        print("\n".join(lines))
-    else:
-        print("no logs yet")
-def config_print():
-    print(json.dumps(load_conf(), indent=2))
-def edit_config():
-    editor = os.environ.get("EDITOR","nano")
-    subprocess.run([editor, str(CONF)])
-def update_binary():
-    conf = load_conf()
-    arch = conf.get("arch")
-    urls = {
-        "amd64":"https://github.com/esrrhs/pingtunnel/releases/download/2.8/pingtunnel_linux_amd64.zip",
-        "arm64":"https://github.com/esrrhs/pingtunnel/releases/download/2.8/pingtunnel_linux_arm64.zip",
-        "386":"https://github.com/esrrhs/pingtunnel/releases/download/2.8/pingtunnel_linux_386.zip"
+    default = {
+        "mode": "server",
+        "server_ip": "127.0.0.1",
+        "port": 4000,
+        "password": "changeme",
+        "memory_mb": 512,
+        "nolog": 1,
+        "noprint": 1,
+        "extra_args": ""
     }
-    url = urls.get(arch)
-    if not url: print("unknown arch"); return
-    import urllib.request, tempfile, zipfile, os
-    tmp = tempfile.mktemp(suffix=".zip")
-    print("downloading",url)
-    urllib.request.urlretrieve(url, tmp)
-    with zipfile.ZipFile(tmp) as z:
-        z.extractall(BIN_DIR)
-    os.unlink(tmp)
-    b = find_bin(load_conf())
-    b.chmod(b.stat().st_mode | 0o111)
-    print("updated binary to",b)
-def uninstall():
-    stop_service()
-    try:
-        if UNIT:
-            subprocess.run(["systemctl", "disable", UNIT], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except:
-        pass
-    for p in [str(INSTALL_DIR), str(SYMLINK), str(PIDFILE), str(LOG_FILE), str(Path("/etc/logrotate.d/pingtunnel"))]:
+    CONFIG_PATH.write_text(json.dumps(default, indent=2))
+
+def apply_memory_dropin(mem_mb):
+    dropin_dir = Path("/etc/systemd/system") / (SYSTEMD_UNIT + ".d")
+    if mem_mb and mem_mb > 0:
+        dropin_dir.mkdir(parents=True, exist_ok=True)
+        (dropin_dir / "memory.conf").write_text("[Service]\nMemoryLimit=%dM\n" % mem_mb)
+        subprocess.run(["systemctl", "daemon-reload"], check=False)
+    else:
         try:
-            path = Path(p)
-            if path.is_symlink(): path.unlink()
-            elif path.is_file(): path.unlink()
-            elif path.is_dir(): shutil.rmtree(path)
+            f = dropin_dir / "memory.conf"
+            if f.exists():
+                f.unlink()
+                subprocess.run(["systemctl", "daemon-reload"], check=False)
         except:
             pass
+
+def install():
+    if not is_root():
+        die("run as root")
+    ensure_dirs()
+    url = detect_url()
+    if not url:
+        die("arch not supported")
+    tmp = tempfile.mktemp(suffix=".zip")
+    download_zip(url, tmp)
+    safe_extract(tmp, BIN_DIR)
+    os.remove(tmp)
+    binp = find_binary()
+    if not binp:
+        die("binary not found after extract")
+    binp.chmod(0o755)
+    write_runner_file()
+    create_default_config()
+    create_symlink()
+    write_systemd_unit()
     try:
-        if Path("/etc/systemd/system").exists():
-            d = Path("/etc/systemd/system") / UNIT
-            if d.exists(): d.unlink()
-            subprocess.run(["systemctl","daemon-reload"])
+        cfg = json.loads(CONFIG_PATH.read_text())
+        apply_memory_dropin(cfg.get("memory_mb", 0))
+    except Exception:
+        pass
+    if shutil.which("systemctl"):
+        subprocess.run(["systemctl", "enable", SYSTEMD_UNIT], check=False)
+        subprocess.run(["systemctl", "start", SYSTEMD_UNIT], check=False)
+        print("installed and started via systemd")
+    else:
+        print("installed. systemd not found; use 'pintunnel start' to run")
+
+def uninstall_all():
+    if not is_root():
+        die("run as root")
+    try:
+        if shutil.which("systemctl"):
+            subprocess.run(["systemctl", "stop", SYSTEMD_UNIT], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(["systemctl", "disable", SYSTEMD_UNIT], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except:
+        pass
+    try:
+        dr = Path("/etc/systemd/system") / (SYSTEMD_UNIT + ".d")
+        if dr.exists():
+            for f in dr.iterdir():
+                f.unlink()
+            dr.rmdir()
+            subprocess.run(["systemctl", "daemon-reload"], check=False)
+    except:
+        pass
+    try:
+        if UNIT_PATH.exists():
+            UNIT_PATH.unlink()
+            subprocess.run(["systemctl", "daemon-reload"], check=False)
+    except:
+        pass
+    try:
+        if SYMLINK.exists() or SYMLINK.is_symlink():
+            SYMLINK.unlink()
+    except:
+        pass
+    try:
+        if RUNNER_PATH.exists():
+            RUNNER_PATH.unlink()
+    except:
+        pass
+    try:
+        if INSTALL_DIR.exists():
+            shutil.rmtree(INSTALL_DIR)
+    except:
+        pass
+    try:
+        if LOG_DIR.exists():
+            shutil.rmtree(LOG_DIR)
+    except:
+        pass
+    try:
+        if PID_FILE.exists():
+            PID_FILE.unlink()
     except:
         pass
     print("uninstalled")
-if __name__=="__main__":
-    import json, shutil
-    if len(sys.argv)>1:
-        cmd = sys.argv[1]
-        if cmd=="--run":
-            monitor_loop()
-        elif cmd=="start":
-            start_service()
-        elif cmd=="stop":
-            stop_service()
-        elif cmd=="restart":
-            stop_service(); time.sleep(1); start_service()
-        elif cmd=="status":
-            status()
-        elif cmd=="logs":
-            n = int(sys.argv[2]) if len(sys.argv)>2 else 200
-            logs(n)
-        elif cmd=="config":
-            config_print()
-        elif cmd=="edit":
-            edit_config()
-        elif cmd=="update":
-            update_binary()
-        elif cmd=="uninstall":
-            uninstall()
+
+def show_menu():
+    print("""
+Pingtunnel manager
+1) Install / Setup
+2) Start
+3) Stop
+4) Restart
+5) Status
+6) Logs (200 lines)
+7) Edit config
+8) Update binary
+9) Uninstall
+10) Exit
+""")
+
+def main_menu():
+    if not is_root():
+        die("run as root")
+    while True:
+        show_menu()
+        c = input("choice: ").strip()
+        if c == "1":
+            install()
+        elif c == "2":
+            subprocess.run([str(RUNNER_PATH), "start"])
+        elif c == "3":
+            subprocess.run([str(RUNNER_PATH), "stop"])
+        elif c == "4":
+            subprocess.run([str(RUNNER_PATH), "restart"])
+        elif c == "5":
+            subprocess.run([str(RUNNER_PATH), "status"])
+        elif c == "6":
+            subprocess.run([str(RUNNER_PATH), "logs", "200"])
+        elif c == "7":
+            subprocess.run([str(RUNNER_PATH), "edit"])
+        elif c == "8":
+            subprocess.run([str(RUNNER_PATH), "update"])
+        elif c == "9":
+            yn = input("Are you sure? (yes/no): ").strip().lower()
+            if yn == "yes":
+                uninstall_all()
+        elif c == "10":
+            break
         else:
-            print("commands: start stop restart status logs config edit update uninstall")
-    else:
-        print("commands: start stop restart status logs config edit update uninstall")
-"""
+            print("invalid")
 
 if __name__ == "__main__":
-    try:
-        install_flow()
-    except Exception as e:
-        log("installer failed: " + str(e))
-        raise
+    if len(sys.argv) > 1:
+        cmd = sys.argv[1].lower()
+        if cmd in ("install","setup"):
+            install()
+        elif cmd == "uninstall":
+            uninstall_all()
+        elif cmd in ("start","stop","restart","status","logs","edit","update"):
+            if RUNNER_PATH.exists():
+                subprocess.run([str(RUNNER_PATH), cmd] + sys.argv[2:])
+            else:
+                print("runner not found; install first")
+        else:
+            print("unknown arg")
+    else:
+        main_menu()
