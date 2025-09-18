@@ -10,6 +10,7 @@ This project provides an easy-to-use installer and manager for [Pingtunnel](http
 - Python 3
 - Bash
 - `curl` for downloading the installer
+- Atleast 1 GB Both Server Memory
 
 ---
 
