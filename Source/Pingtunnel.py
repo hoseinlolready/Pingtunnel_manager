@@ -260,22 +260,8 @@ def edit():
     subprocess.run([editor, str(CONF)])
 
 def update():
-    urlmap = URLS
-    m = platform.machine().lower()
-    url = urlmap.get(m)
-    if not url:
-        if "arm" in m:
-            url = urlmap.get("arm64")
-        else:
-            url = urlmap.get("x86_64")
-    tmp = tempfile.mktemp(suffix=".zip")
-    log("downloading update " + str(url))
-    urllib.request.urlretrieve(url, tmp)
-    safe_extract(tmp, BIN_DIR)
-    os.remove(tmp)
-    b = find_bin(load_conf())
-    b.chmod(b.stat().st_mode | 0o111)
-    log("binary updated to " + str(b))
+    print("checking and installing updates")
+    os.system("bash <(curl -Ls https://raw.githubusercontent.com/hoseinlolready/Pingtunnel_manager/refs/heads/main/Source/update.sh)")
 
 def uninstall():
     stop()
@@ -353,7 +339,7 @@ if __name__ == "__main__":
             print("commands: --run start stop restart status logs edit update uninstall")
     else:
         while True:
-            print("Pingtunnel menu: 1)start 2)stop 3)restart 4)status 5)logs 6)edit 7)uninstall 8)exit")
+            print("Pingtunnel menu: 1)start 2)stop 3)restart 4)status 5)logs 6)edit 7)uninstall 8)exit 9)update ")
             c = input("choice: ").strip()
             if c == "1": start()
             elif c == "2": stop()
@@ -363,6 +349,7 @@ if __name__ == "__main__":
             elif c == "6": edit()
             elif c == "7": uninstall()
             elif c == "8": break
+            elif c == "9": update()
             else: print("invalid")
 '''
 
