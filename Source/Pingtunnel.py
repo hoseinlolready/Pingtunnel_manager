@@ -279,6 +279,9 @@ def update():
 
 def uninstall():
     stop()
+    os.system("systemctl disable pingtunnel.service")
+    os.remove(INSTALL_DIR)
+    os.remove(LOG_DIR)
     if is_systemd_available():
         subprocess.run(["systemctl","disable",UNIT], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
@@ -347,7 +350,7 @@ if __name__ == "__main__":
             print("commands: --run start stop restart status logs edit update uninstall")
     else:
         while True:
-            print("\\nrun_pingtunnel menu: 1)start 2)stop 3)restart 4)status 5)logs 6)edit 7)update 8)uninstall 9)exit")
+            print("Pingtunnel menu: 1)start 2)stop 3)restart 4)status 5)logs 6)edit 7)update 8)uninstall 9)exit")
             c = input("choice: ").strip()
             if c == "1": start()
             elif c == "2": stop()
@@ -416,14 +419,14 @@ def interactive_config():
             cfg["l_port"] = int(4000)
         server = input("Server IP (-s) or host: ").strip()
         cfg["server"] = server or "127.0.0.1"
-    key = input("Connection key/password (-key) [changeme]: ").strip() or "changeme"
+    key = input("Connection key/password (-key) be number [123456]: ").strip() or "123456"
     cfg["key"] = key
     tcp = input("Use TCP? (-tcp) 1=yes 0=no [1]: ").strip() or "1"
     try:
         cfg["tcp"] = int(tcp)
     except:
         cfg["tcp"] = 1
-    mem = input("Memory limit for systemd in MB (0 to disable) [0]: ").strip() or "0"
+    mem = input("Memory limit for systemd in MB (0 to disable) [500]: ").strip() or "500"
     try:
         cfg["memory_mb"] = int(mem)
     except:
