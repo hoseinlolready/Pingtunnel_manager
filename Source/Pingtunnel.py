@@ -352,7 +352,7 @@ if __name__ == "__main__":
             print("commands: --run start stop restart status logs edit update uninstall")
     else:
         while True:
-            print("Pingtunnel menu: 1)start 2)stop 3)restart 4)status 5)logs 6)edit 7)update 8)uninstall 9)exit")
+            print("Pingtunnel menu: 1)start 2)stop 3)restart 4)status 5)logs 6)edit 7)uninstall 8)exit")
             c = input("choice: ").strip()
             if c == "1": start()
             elif c == "2": stop()
@@ -360,9 +360,8 @@ if __name__ == "__main__":
             elif c == "4": status()
             elif c == "5": logs()
             elif c == "6": edit()
-            elif c == "7": update()
-            elif c == "8": uninstall()
-            elif c == "9": break
+            elif c == "7": uninstall()
+            elif c == "8": break
             else: print("invalid")
 '''
 
