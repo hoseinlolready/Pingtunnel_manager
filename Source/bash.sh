@@ -35,11 +35,11 @@ uninstall_pingtunnel() {
     if command -v pingtunnel >/dev/null 2>&1; then
       pingtunnel uninstall
     else
-      echo "❌ Neither installer nor runner found."
+      echo "❌ The uninstalling failed."
     fi
   else
     echo "🗑️ Running uninstaller..."
-    $PYTHON_BIN "$INSTALLER_PATH" --uninstall
+    $PYTHON_BIN "$INSTALLER_PATH" uninstall
     echo "✅ Uninstall finished"
   fi
   read -n 1 -s -r -p "Press any key to continue..."
