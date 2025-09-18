@@ -138,7 +138,7 @@ def build_args(conf, binpath):
             args += ["-type", "client"]
         server = conf.get("server")
         if server:
-            args += ["-s", str(server)]
+            args += ["-s", str(server), "-t", str(server) + ":" + str(lport)]
         args += ["-tcp", "1", "-key", key, "-noprint", "1", "-nolog", "1"]
     return args
 
