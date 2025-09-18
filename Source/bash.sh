@@ -80,6 +80,7 @@ show_menu() {
   clear
   echo "============================"
   echo "   Pingtunnel Installer"
+  echo "         V 1.0.0       "
   echo "============================"
   echo "1) Install Pingtunnel"
   echo "2) Uninstall Pingtunnel"
