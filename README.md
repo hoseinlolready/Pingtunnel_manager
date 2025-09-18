@@ -23,13 +23,13 @@ bash <(curl -Ls https://raw.githubusercontent.com/hoseinlolready/Pingtunnel_mana
 ```
 ---
 ## The usage :
-pingtunnel start # Start the tunnel
-pingtunnel stop # Stop the tunnel
-pingtunnel restart # Restart the tunnel
-pingtunnel status # Show the status of tunnel
-pingtunnel logs # Show the tunnel log
-pingtunnel edit # Edit config
-pingtunnel uninstall # Uninstall the tunnel
+- pingtunnel start # Start the tunnel
+- pingtunnel stop # Stop the tunnel
+- pingtunnel restart # Restart the tunnel
+- pingtunnel status # Show the status of tunnel
+- pingtunnel logs # Show the tunnel log
+- pingtunnel edit # Edit config
+- pingtunnel uninstall # Uninstall the tunnel
 ---
 
 ## License
