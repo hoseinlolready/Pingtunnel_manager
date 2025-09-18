@@ -432,7 +432,7 @@ def interactive_config():
         cfg["memory_mb"] = int(mem)
     except:
         cfg["memory_mb"] = 0
-    aut = input("Enable systemd autostart? (y/N) [N]: ").strip().lower()
+    aut = input("Are you sure to setup this in not Reinstall? (y/N) : ").strip().lower()
     cfg["autostart"] = aut == "y"
     cfg["installed_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
     CONFIG_PATH.write_text(json.dumps(cfg, indent=2))
