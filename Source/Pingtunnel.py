@@ -129,9 +129,8 @@ def build_args(conf, binpath):
     key = conf.get("key", "")
     tcp = str(conf.get("tcp", 1))
     if t == "server":
-        args += ["-type", "server", "-tcp", tcp, "-key", key]
+        args += ["-type", "server", "-tcp", " 1", "-key", key]
     else:
-        # client: include -l :PORT and -s SERVER only for client
         lport = conf.get("l_port")
         if lport:
             args += ["-type", "client", "-l", ":" + str(lport)]
@@ -140,7 +139,7 @@ def build_args(conf, binpath):
         server = conf.get("server")
         if server:
             args += ["-s", str(server)]
-        args += ["-tcp", tcp, "-key", key]
+        args += ["-tcp", " 1", "-key", key]
     return args
 
 def apply_systemd_mem(conf):
