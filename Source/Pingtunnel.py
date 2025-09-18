@@ -344,6 +344,8 @@ if __name__ == "__main__":
             edit()
         elif cmd == "update":
             update()
+        elif cmd == "--uninstall":
+            uninstall()
         elif cmd == "uninstall":
             uninstall()
         else:
