@@ -282,6 +282,7 @@ def uninstall():
     os.system("systemctl disable pingtunnel.service")
     os.system("rm -rf /var/log/pingtunnel")
     os.system("rm -rf /opt/pingtunnel")
+    os.system("rm -rf /usr/local/bin/pingtunnel")
     if is_systemd_available():
         subprocess.run(["systemctl","disable",UNIT], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
