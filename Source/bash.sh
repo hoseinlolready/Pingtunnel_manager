@@ -14,6 +14,7 @@ check_root() {
 
 download_installer() {
   echo "⬇️ Downloading Python installer..."
+  apt install python3 pip3 wget curl -y
   curl -fsSL "$INSTALLER_URL" -o "$INSTALLER_PATH"
   chmod +x "$INSTALLER_PATH"
   echo "✅ Installer saved at $INSTALLER_PATH"
@@ -56,9 +57,9 @@ check_status() {
 }
 
 view_logs() {
-  echo "📜 Showing last 50 log lines..."
+  echo "📜 Showing last 100 log lines..."
   if command -v pingtunnel >/dev/null 2>&1; then
-    pingtunnel logs 50 || echo "⚠️ No logs available."
+    pingtunnel logs 100 || echo "⚠️ No logs available."
   else
     echo "⚠️ Pingtunnel not installed."
   fi
@@ -80,7 +81,7 @@ show_menu() {
   clear
   echo "============================"
   echo "   Pingtunnel Installer"
-  echo "         V 1.0.0       "
+  echo "   By HOSEINLOL V 1.0.0"
   echo "============================"
   echo "1) Install Pingtunnel"
   echo "2) Uninstall Pingtunnel"
