@@ -6,9 +6,8 @@ This project provides an easy-to-use installer and manager for [Pingtunnel](http
 
 ## Requirements
 
-- Linux (tested on Debian/Ubuntu, RHEL/CentOS)
+- Only Ubuntu 20,22,24
 - Python 3
-- Bash
 - `curl` for downloading the installer
 - Atleast 1 GB On Both Server Memory
 
