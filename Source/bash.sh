@@ -14,7 +14,7 @@ check_root() {
 
 download_installer() {
   echo "⬇️ Downloading Python installer..."
-  apt install python3 pip3 wget curl -y
+  apt install python3 wget curl -y
   curl -fsSL "$INSTALLER_URL" -o "$INSTALLER_PATH"
   chmod +x "$INSTALLER_PATH"
   echo "✅ Installer saved at $INSTALLER_PATH"
