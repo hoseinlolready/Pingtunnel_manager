@@ -261,8 +261,8 @@ def edit():
 
 def update():
     print("checking and installing updates")
-    os.system("bash <(curl -Ls https://raw.githubusercontent.com/hoseinlolready/Pingtunnel_manager/refs/heads/main/Source/update.sh)")
-
+    print("Developer currently not setup the update system")
+    
 def uninstall():
     stop()
     os.system("systemctl disable pingtunnel.service")
