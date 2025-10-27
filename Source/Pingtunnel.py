@@ -134,7 +134,7 @@ def build_args(conf, binpath):
         if tcp == 1:
             args += ["-tcp", "1"]
         else:
-            args += ["-tcp", "0"]
+            args += []
     else:
         lport = conf.get("l_port")
         if lport:
