@@ -14,8 +14,8 @@ check_root() {
 
 download_installer() {
   echo "⬇️ Downloading Python installer..."
-  python3 -m pip install colorama
-  apt install python3 wget curl -y
+  apt install python3 python3-pip wget curl -y
+  pip3 install colorama
   curl -fsSL "$INSTALLER_URL" -o "$INSTALLER_PATH"
   chmod +x "$INSTALLER_PATH"
   echo "✅ Installer saved at $INSTALLER_PATH"
