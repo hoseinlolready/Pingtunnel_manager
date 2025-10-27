@@ -127,9 +127,14 @@ def build_args(conf, binpath):
     args = [str(binpath)]
     t = conf.get("type", "server").lower()
     key = conf.get("key", "")
-    tcp = str(conf.get("tcp", 1))
+    tcp = conf.get("tcp", 1)
+    
     if t == "server":
-        args += ["-type", "server", "-tcp", "1", "-key", key, "-noprint", "1", "-nolog", "1"]
+        args += ["-type", "server", "-key", key, "-noprint", "1", "-nolog", "1"]
+        if tcp == 1:
+            args += ["-tcp", "1"]
+        else:
+            args += []
     else:
         lport = conf.get("l_port")
         if lport:
@@ -139,7 +144,11 @@ def build_args(conf, binpath):
         server = conf.get("server")
         if server:
             args += ["-s", str(server), "-t", str(server) + ":" + str(lport)]
-        args += ["-tcp", "1", "-key", key, "-noprint", "1", "-nolog", "1"]
+        args += ["-key", key, "-noprint", "1", "-nolog", "1"]
+        if tcp == 1:
+            args += ["-tcp", "1"]
+        else:
+            args += ["-tcp", "0"]
     return args
 
 def apply_systemd_mem(conf):
@@ -410,7 +419,7 @@ def interactive_config():
         cfg["server"] = server or "127.0.0.1"
     key = input("Connection key/password (-key) be number [123456]: ").strip() or "123456"
     cfg["key"] = key
-    tcp = input("Use TCP? (-tcp) 1=yes 0=no [1]: ").strip() or "1"
+    tcp = input("Do you want Use TCP = 1 or UDP = 0 [1]: ").strip() or "1"
     try:
         cfg["tcp"] = int(tcp)
     except:
