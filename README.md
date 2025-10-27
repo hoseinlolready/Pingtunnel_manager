@@ -1,5 +1,12 @@
 # Pingtunnel Manager Version 1.0.1
 
+<p>
+  <img src="https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python" alt="Python Version">
+  <img src="https://img.shields.io/github/stars/hoseinlolready/Pingtunnel_manager?style=for-the-badge&logo=github&label=Stars" alt="GitHub Stars">
+  <img src="https://img.shields.io/github/forks/hoseinlolready/Pingtunnel_manager?style=for-the-badge&logo=github&label=Forks" alt="GitHub Forks">
+  <img src="https://img.shields.io/github/v/release/hoseinlolready/Pingtunnel_manager?label=version&color=blue" alt="Github Version">
+</p>
+
 This project provides an easy-to-use installer and manager for [Pingtunnel](https://github.com/esrrhs/pingtunnel), allowing you to install, configure, run, and manage your Pingtunnel server or client with a simple interactive menu.
 
 ---
