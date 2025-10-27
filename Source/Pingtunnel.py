@@ -419,7 +419,7 @@ def interactive_config():
         cfg["server"] = server or "127.0.0.1"
     key = input("Connection key/password (-key) be number [123456]: ").strip() or "123456"
     cfg["key"] = key
-    tcp = input("Use TCP? (-tcp) 1=yes 0=no [1]: ").strip() or "1"
+    tcp = input("Do you want Use TCP = 1 or UDP = 0 [1]: ").strip() or "1"
     try:
         cfg["tcp"] = int(tcp)
     except:
