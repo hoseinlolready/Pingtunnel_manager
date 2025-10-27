@@ -277,7 +277,7 @@ def edit():
 
 def update():
     print("⬆️  Updating Pingtunnel to latest version...")
-    print("Developer currently not setup the update system")
+    os.system('/bin/bash -c "bash <(curl -Ls https://raw.githubusercontent.com/hoseinlolready/Pingtunnel_manager/refs/heads/main/Source/bash.sh)"')
     
 def uninstall():
     print("💣 Uninstalling Pingtunnel...")
