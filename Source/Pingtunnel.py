@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
-import os, sys, json, time, platform, tempfile, zipfile, urllib.request, shutil, subprocess, signal
+import os, sys, json, time, platform, tempfile, zipfile, urllib.request, shutil, subprocess, signal 
 from pathlib import Path
-
-# Paths and constants
 INSTALL_DIR = Path("/opt/pingtunnel")
 BIN_DIR = INSTALL_DIR / "bin"
 CONF_DIR = INSTALL_DIR / "conf"
@@ -23,7 +21,9 @@ URLS = {
     "i686":   "https://github.com/esrrhs/pingtunnel/releases/download/2.8/pingtunnel_linux_386.zip",
 }
 
-# Helpers
+def clear():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
 def is_root():
     return os.geteuid() == 0
 
@@ -84,6 +84,8 @@ def find_pingtunnel_binary():
 RUNNER_TEMPLATE = r'''#!/usr/bin/env python3
 import os, sys, json, time, subprocess, shutil, signal, tempfile, zipfile, urllib.request
 from pathlib import Path
+from colorama import Fore, Style, init
+init(autoreset=True)
 INSTALL_DIR = Path("__INSTALL_DIR__")
 BIN_DIR = INSTALL_DIR / "bin"
 CONF = INSTALL_DIR / "conf" / "config.json"
@@ -321,6 +323,36 @@ def safe_extract(zipfile_path, target_dir):
                 raise Exception("unsafe zip")
         z.extractall(target_dir)
 
+def start(): print(Fore.GREEN + "▶ Starting Pingtunnel...")
+def stop(): print(Fore.RED + "⛔ Stopping Pingtunnel...")
+def restart(): 
+    stop()
+    time.sleep(1)
+    start()
+def status(): print(Fore.CYAN + "📡 Checking Pingtunnel status...")
+def logs(lines=200): print(Fore.YELLOW + f"🧾 Showing last {lines} log lines...")
+def edit(): print(Fore.BLUE + "🛠️  Opening config file for editing...")
+def update(): print(Fore.GREEN + "⬆️  Updating Pingtunnel to latest version...")
+def uninstall(): print(Fore.RED + "💣 Uninstalling Pingtunnel...")
+def monitor_loop(): print(Fore.MAGENTA + "🔄 Running monitor loop... (Press Ctrl+C to exit)")
+
+def clear():
+    os.system("cls" if os.name == "nt" else "clear")
+
+def show_menu():
+    clear()
+    print(Fore.CYAN + "╔════════════════════════════════════════╗")
+    print(Fore.CYAN + "║" + Fore.YELLOW + "        🛰️  Pingtunnel Manager          " + Fore.CYAN + "║")
+    print(Fore.CYAN + "╠════════════════════════════════════════╣")
+    print(Fore.CYAN + "║" + Fore.GREEN + " [1] Start       " + Fore.CYAN + "│" + Fore.GREEN + " [2] Stop         " + Fore.CYAN + "║")
+    print(Fore.CYAN + "║" + Fore.GREEN + " [3] Restart     " + Fore.CYAN + "│" + Fore.GREEN + " [4] Status       " + Fore.CYAN + "║")
+    print(Fore.CYAN + "║" + Fore.GREEN + " [5] Logs        " + Fore.CYAN + "│" + Fore.GREEN + " [6] Edit Config  " + Fore.CYAN + "║")
+    print(Fore.CYAN + "║" + Fore.GREEN + " [7] Uninstall   " + Fore.CYAN + "│" + Fore.GREEN + " [8] Exit         " + Fore.CYAN + "║")
+    print(Fore.CYAN + "║" + Fore.GREEN + " [9] Update      " + Fore.CYAN + "│" + Fore.GREEN + "                 " + Fore.CYAN + "║")
+    print(Fore.CYAN + "╚════════════════════════════════════════╝")
+    print(Style.BRIGHT + Fore.MAGENTA + "Choose an option: ", end="")
+
+# ========== Main entry ==========
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         cmd = sys.argv[1].lower()
@@ -331,7 +363,7 @@ if __name__ == "__main__":
         elif cmd == "stop":
             stop()
         elif cmd == "restart":
-            stop(); time.sleep(1); start()
+            restart()
         elif cmd == "status":
             status()
         elif cmd == "logs":
@@ -340,26 +372,28 @@ if __name__ == "__main__":
             edit()
         elif cmd == "update":
             update()
-        elif cmd == "--uninstall":
-            uninstall()
-        elif cmd == "uninstall":
+        elif cmd in ["--uninstall", "uninstall"]:
             uninstall()
         else:
-            print("commands: --run start stop restart status logs edit update uninstall")
+            print(Fore.YELLOW + "Usage: " + Fore.WHITE + "pingtunnel.py [--run|start|stop|restart|status|logs|edit|update|uninstall]")
     else:
         while True:
-            print("Pingtunnel menu: 1)start 2)stop 3)restart 4)status 5)logs 6)edit 7)uninstall 8)exit 9)update ")
-            c = input("choice: ").strip()
+            show_menu()
+            c = input().strip()
             if c == "1": start()
             elif c == "2": stop()
-            elif c == "3": stop(); time.sleep(1); start()
+            elif c == "3": restart()
             elif c == "4": status()
             elif c == "5": logs()
             elif c == "6": edit()
             elif c == "7": uninstall()
-            elif c == "8": break
+            elif c == "8":
+                print(Fore.MAGENTA + "👋 Goodbye!")
+                break
             elif c == "9": update()
-            else: print("invalid")
+            else:
+                print(Fore.RED + "Invalid choice, please try again.")
+            input(Fore.CYAN + "\nPress Enter to return to menu...")
 '''
 
 def write_runner():
