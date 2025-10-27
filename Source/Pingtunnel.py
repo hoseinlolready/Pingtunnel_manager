@@ -277,7 +277,7 @@ def edit():
 
 def update():
     print("⬆️  Updating Pingtunnel to latest version...")
-    os.system('/bin/bash -c "bash <(curl -Ls https://raw.githubusercontent.com/hoseinlolready/Pingtunnel_manager/refs/heads/main/Source/bash.sh)"')
+    os.system('/bin/bash -c "bash <(curl -Ls https://raw.githubusercontent.com/hoseinlolready/Pingtunnel_manager/refs/heads/main/Source/update.sh)"')
     
 def uninstall():
     print("💣 Uninstalling Pingtunnel...")
