@@ -2,7 +2,7 @@
 set -e
 
 PYTHON_BIN="python3"
-INSTALLER_URL="https://raw.githubusercontent.com/hoseinlolready/Pingtunnel_manager/refs/heads/main/Source/Pingtunnel.py" 
+INSTALLER_URL="https://raw.githubusercontent.com/hoseinlolready/Pingtunnel_manager/refs/heads/dev/Source/Pingtunnel.py" 
 INSTALLER_PATH="/usr/local/bin/install_pingtunnel.py"
 
 check_root() {
