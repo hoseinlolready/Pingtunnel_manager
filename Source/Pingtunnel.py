@@ -170,6 +170,7 @@ def apply_systemd_mem(conf):
                 pass
 
 def monitor_loop():
+    print("🔄 Running monitor loop... (Press Ctrl+C to exit)")
     conf = load_conf()
     binpath = find_bin(conf)
     apply_systemd_mem(conf)
@@ -209,6 +210,7 @@ def is_systemd_available():
     return shutil.which("systemctl") is not None and Path("/run/systemd/system").exists()
 
 def start():
+    print("▶ Starting Pingtunnel...")
     if is_systemd_available():
         subprocess.run(["systemctl","start",UNIT])
         log("systemctl start requested")
@@ -224,6 +226,7 @@ def start():
     log("background monitor started pid=%d" % p.pid)
 
 def stop():
+    print("⛔ Stopping Pingtunnel...")
     if is_systemd_available():
         subprocess.run(["systemctl","stop",UNIT])
         log("systemctl stop requested")
@@ -247,6 +250,7 @@ def stop():
         log("pkill fallback used")
 
 def status():
+    print("📡 Checking Pingtunnel status...")
     if is_systemd_available():
         subprocess.run(["systemctl","status",UNIT,"--no-pager"])
         return
@@ -261,6 +265,7 @@ def status():
     subprocess.run(["pgrep","-fl","pingtunnel"])
 
 def logs(n=200):
+    print("🧾 Showing last {lines} log lines...")
     if LOG_FILE.exists():
         subprocess.run(["tail","-n", str(n), str(LOG_FILE)])
     else:
@@ -271,10 +276,11 @@ def edit():
     subprocess.run([editor, str(CONF)])
 
 def update():
-    print("checking and installing updates")
+    print("⬆️  Updating Pingtunnel to latest version...")
     print("Developer currently not setup the update system")
     
 def uninstall():
+    print("💣 Uninstalling Pingtunnel...")
     stop()
     os.system("systemctl disable pingtunnel.service")
     os.system("rm -rf /var/log/pingtunnel")
@@ -323,32 +329,19 @@ def safe_extract(zipfile_path, target_dir):
                 raise Exception("unsafe zip")
         z.extractall(target_dir)
 
-def start(): print(Fore.GREEN + "▶ Starting Pingtunnel...")
-def stop(): print(Fore.RED + "⛔ Stopping Pingtunnel...")
-def restart(): 
-    stop()
-    time.sleep(1)
-    start()
-def status(): print(Fore.CYAN + "📡 Checking Pingtunnel status...")
-def logs(lines=200): print(Fore.YELLOW + f"🧾 Showing last {lines} log lines...")
-def edit(): print(Fore.BLUE + "🛠️  Opening config file for editing...")
-def update(): print(Fore.GREEN + "⬆️  Updating Pingtunnel to latest version...")
-def uninstall(): print(Fore.RED + "💣 Uninstalling Pingtunnel...")
-def monitor_loop(): print(Fore.MAGENTA + "🔄 Running monitor loop... (Press Ctrl+C to exit)")
-
 def clear():
     os.system("cls" if os.name == "nt" else "clear")
 
 def show_menu():
     clear()
     print(Fore.CYAN + "╔════════════════════════════════════════╗")
-    print(Fore.CYAN + "║" + Fore.YELLOW + "        🛰️  Pingtunnel Manager          " + Fore.CYAN + "║")
+    print(Fore.CYAN + "║" + Fore.YELLOW + "        🛰️  Pingtunnel Manager           " + Fore.CYAN + "║")
     print(Fore.CYAN + "╠════════════════════════════════════════╣")
-    print(Fore.CYAN + "║" + Fore.GREEN + " [1] Start       " + Fore.CYAN + "│" + Fore.GREEN + " [2] Stop         " + Fore.CYAN + "║")
-    print(Fore.CYAN + "║" + Fore.GREEN + " [3] Restart     " + Fore.CYAN + "│" + Fore.GREEN + " [4] Status       " + Fore.CYAN + "║")
-    print(Fore.CYAN + "║" + Fore.GREEN + " [5] Logs        " + Fore.CYAN + "│" + Fore.GREEN + " [6] Edit Config  " + Fore.CYAN + "║")
-    print(Fore.CYAN + "║" + Fore.GREEN + " [7] Uninstall   " + Fore.CYAN + "│" + Fore.GREEN + " [8] Exit         " + Fore.CYAN + "║")
-    print(Fore.CYAN + "║" + Fore.GREEN + " [9] Update      " + Fore.CYAN + "│" + Fore.GREEN + "                 " + Fore.CYAN + "║")
+    print(Fore.CYAN + "║" + Fore.GREEN + " [1] Start       " + Fore.CYAN + "│" + Fore.GREEN + " [2] Stop                    " + Fore.CYAN + "║")
+    print(Fore.CYAN + "║" + Fore.GREEN + " [3] Restart     " + Fore.CYAN + "│" + Fore.GREEN + " [4] Status                  " + Fore.CYAN + "║")
+    print(Fore.CYAN + "║" + Fore.GREEN + " [5] Logs        " + Fore.CYAN + "│" + Fore.GREEN + " [6] Edit Config             " + Fore.CYAN + "║")
+    print(Fore.CYAN + "║" + Fore.GREEN + " [7] Uninstall   " + Fore.CYAN + "│" + Fore.GREEN + " [8] Exit                    " + Fore.CYAN + "║")
+    print(Fore.CYAN + "║" + Fore.GREEN + " [9] Update      " + Fore.CYAN + "│" + Fore.GREEN + "                             " + Fore.CYAN + "║")
     print(Fore.CYAN + "╚════════════════════════════════════════╝")
     print(Style.BRIGHT + Fore.MAGENTA + "Choose an option: ", end="")
 
