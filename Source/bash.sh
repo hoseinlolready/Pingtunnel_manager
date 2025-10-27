@@ -82,6 +82,7 @@ show_menu() {
   echo "============================"
   echo "   Pingtunnel Installer"
   echo "   By HOSEINLOL V 1.0.0"
+  echo "   Developer Mode active "
   echo "============================"
   echo "1) Install / Update Pingtunnel"
   echo "2) Uninstall Pingtunnel"
