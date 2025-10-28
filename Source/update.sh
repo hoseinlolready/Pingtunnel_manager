@@ -25,6 +25,7 @@ updater_pingtunnel() {
   check_root
   download_updater
   echo "🚀 Running Updater..."
+  pingtunnel stop
   $PYTHON_BIN "$INSTALLER_PATH"
   read -n 1 -s -r -p "Press any key to continue..."
 }
