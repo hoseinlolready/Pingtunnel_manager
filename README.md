@@ -1,5 +1,13 @@
 # Pingtunnel Manager Version 1.0.1
-
+<div align="center" style="margin-bottom: 30px;">
+  <img src="https://img.shields.io/github/license/hoseinlolready/pingtunnel_manager" alt="license">
+  <img src="https://img.shields.io/badge/Foreign_Servers-Supported-orange?style=for-the-badge&logo=serverless" alt="foreignserver">
+  
+  <div style="margin-top: 15px;">
+    <img src="https://img.shields.io/badge/x86_64-Supported-success?style=flat-square&logo=amd" alt="x86_64">
+    <img src="https://img.shields.io/badge/ARM64-Supported-success?style=flat-square&logo=arm" alt="ARM64">
+  </div>
+</div>
 <p>
   <img src="https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python" alt="Python Version">
   <img src="https://img.shields.io/github/stars/hoseinlolready/Pingtunnel_manager?style=for-the-badge&logo=github&label=Stars" alt="GitHub Stars">
