@@ -30,17 +30,17 @@ This project provides an easy-to-use installer and manager for [Pingtunnel](http
 
 ## 📂 Installation
 
-1. The Bash menu installer :
+1. 📋 The Bash menu installer :
 
 ```bash
 bash <(curl -Ls https://raw.githubusercontent.com/hoseinlolready/Pingtunnel_manager/refs/heads/main/Source/bash.sh)
 ```
-## The tutorial (Farsi)
+## 🧠 The tutorial (Farsi)
 
 https://www.youtube.com/watch?v=JvgmdQ6DCxU
 
 ---
-## The usage :
+## ⚙️ The usage :
 - Pingtunnel # GUI of script
 - pingtunnel start # Start the tunnel
 - pingtunnel stop # Stop the tunnel
