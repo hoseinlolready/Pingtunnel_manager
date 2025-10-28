@@ -19,7 +19,7 @@ This project provides an easy-to-use installer and manager for [Pingtunnel](http
 
 ---
 
-## Requirements
+## 📦 Requirements
 
 - Only Ubuntu 20,22,24
 - Python 3
@@ -28,7 +28,7 @@ This project provides an easy-to-use installer and manager for [Pingtunnel](http
 
 ---
 
-## Installation
+## 📂 Installation
 
 1. The Bash menu installer :
 
@@ -51,7 +51,7 @@ https://www.youtube.com/watch?v=JvgmdQ6DCxU
 - pingtunnel uninstall # Uninstall the tunnel
 ---
 
-## License
+## 🪪 License
 
 This project is licensed under the Apache License 2.0.  
 See the [LICENSE](LICENSE) file for details.
