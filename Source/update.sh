@@ -2,7 +2,7 @@
 set -e
 
 PYTHON_BIN="python3"
-INSTALLER_URL="https://raw.githubusercontent.com/hoseinlolready/Pingtunnel_manager/refs/heads/main/Source/Pingtunnel.py" 
+INSTALLER_URL="https://raw.githubusercontent.com/hoseinlolready/Pingtunnel_manager/refs/heads/main/Source/Pingtunnel.py"
 INSTALLER_PATH="/usr/local/bin/updater_pingtunnel.py"
 
 check_root() {
@@ -29,6 +29,6 @@ updater_pingtunnel() {
   $PYTHON_BIN "$INSTALLER_PATH"
   read -n 1 -s -r -p "Press any key to continue..."
 }
-echo Starting To Update
 
-updater_pingtunnel()
+echo "Starting To Update"
+updater_pingtunnel
