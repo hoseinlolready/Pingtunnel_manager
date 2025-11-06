@@ -37,7 +37,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/hoseinlolready/Pingtunnel_mana
 ```
 ## 🧠 The tutorial (Farsi)
 
-https://www.youtube.com/watch?v=JvgmdQ6DCxU
+[![Watch the video](https://img.youtube.com/vi/JvgmdQ6DCxU/maxresdefault.jpg)](https://www.youtube.com/watch?v=JvgmdQ6DCxU)
 
 ---
 ## ⚙️ The usage :
