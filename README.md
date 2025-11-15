@@ -1,6 +1,5 @@
 # Pingtunnel Manager Version 1.0.3
 <div align="center" style="margin-bottom: 30px;">
-  <img src="https://img.shields.io/github/license/hoseinlolready/pingtunnel_manager" alt="license">
   <img src="https://img.shields.io/badge/Foreign_Servers-Supported-orange?style=for-the-badge&logo=serverless" alt="foreignserver">
   
   <div style="margin-top: 15px;">
